@@ -51,8 +51,12 @@ void ss_processor(ss_int_t listen_socket)
 	ss_char_t procotol[10];
 	ss_char_t real_path[10001];
 
+	alarm(5);		/* set timeout */
+
 	if (0 < recv(listen_socket, recv_string, sizeof(recv_string), 0))
 	{
+		alarm(0);	/* stop alarm */
+
 		if (0 != strlen(module_path))
 		{
 			if (-1 == (module_ret = process_func(listen_socket, recv_string))) /*return -1 means 502 error occurs.*/
