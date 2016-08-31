@@ -50,7 +50,8 @@ void ss_processor(ss_int_t listen_socket)
 	ss_char_t request_path[10000];
 	ss_char_t procotol[10];
 	ss_char_t real_path[10001];
-
+	ss_char_t testpath[10000];
+	
 	alarm(5);		/* set timeout */
 
 	if (0 < recv(listen_socket, recv_string, sizeof(recv_string), 0))
@@ -80,6 +81,12 @@ void ss_processor(ss_int_t listen_socket)
 			_exit(EXIT_FAILURE);
 		}
 
+		memcpy(testpath, request_path, sizeof(testpath));
+		if (strstr(testpath, "../") != NULL)
+		  {
+		     senderror_404(listen_socket);
+		  }
+		
 		(void)snprintf(real_path, sizeof(real_path), ".%s", request_path);
 		
 		if (0 != strlen(cgi_bin_path))
