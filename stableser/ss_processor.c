@@ -85,6 +85,8 @@ void ss_processor(ss_int_t listen_socket)
 		if (strstr(testpath, "../") != NULL)
 		  {
 		     senderror_404(listen_socket);
+		     (void)close(listen_socket);
+		     _exit(EXIT_FAILURE);
 		  }
 		
 		(void)snprintf(real_path, sizeof(real_path), ".%s", request_path);
