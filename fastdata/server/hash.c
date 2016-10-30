@@ -211,8 +211,8 @@ void hash_free(hash_table *hash)
 {
 	bucket *addr;
 	bucket *temp;
-	int i;
-	int data_i;
+	unsigned int i;
+	unsigned int data_i;
 
 	for (i = 0; i < HASH_SIZE; i++)
 	{

@@ -36,6 +36,7 @@ int init_login_info(char *path)
 		}
 	}
 
+
 	if (line_string[strlen(line_string)-1] == '\n')
 	{
 		line_string[strlen(line_string)-1] = '\0';

@@ -1,5 +1,5 @@
 CC		= gcc
-CFLAGS		= -lpthread -g -Wall -Wno-int-to-pointer-cast -std=gnu99 -I../include  -Ofast -funroll-loops -flto -o
+CFLAGS		= -lpthread -g -Wall -Wno-int-to-pointer-cast -std=gnu99 -I../include -O0 -o # -Ofast -funroll-loops -flto -o
 BIN		= init.o processor.o hash.o user.o
 
 all: $(BIN) fastdata_server

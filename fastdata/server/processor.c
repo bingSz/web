@@ -251,6 +251,8 @@ void process_request(void *tsocket)
 	char old_password[1024] = "";
 	char new_password[1024] = "";
 
+	int hash_ret;
+
 	/* About hash table */
 	bucket *ret;
 	unsigned int table_number;
@@ -473,7 +475,7 @@ start:
 
 		goto start;
 	}
-	else if (0 == strcmp(method, "remove_group"))	/* remove_table [table] [name] [data] [num] */
+	else if (0 == strcmp(method, "remove_group"))	/* remove_group [table] [name] [data] [num] */
 	{
 		memcpy(table_name, strtok(NULL, " "), sizeof(table_name));
 		table_number = hash_table_index(table_name);
@@ -493,8 +495,9 @@ start:
 		}
 
 		pthread_mutex_lock(&hash_mutex);
-		if (0 != hash_remove_all(database_data[table_number], data_name, data_data, atoi(strtok(NULL, " "))))
+		hash_ret = hash_remove_all(database_data[table_number], data_name, data_data, atoi(strtok(NULL, " ")));
 		pthread_mutex_unlock(&hash_mutex);
+		if (hash_ret != 0)
 		{
 			send(csocket, "unsuccessfully", 14, MSG_NOSIGNAL);
 			goto start;
@@ -518,6 +521,7 @@ start:
 			send(csocket, "unsuccessfully", 14, MSG_NOSIGNAL);
 			goto start;
 		}
+		send(csocket, "successfully", 12, MSG_NOSIGNAL);
 		goto start;
 	}
 	else
