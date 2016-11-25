@@ -42,8 +42,9 @@ static void ss_post_dynamic(ss_int_t, ss_char_t *, ss_char_t *);
 static void set_based_env(ss_char_t *, ss_char_t *);
 static void set_based_env_get(ss_char_t *, ss_char_t *, ss_char_t *);
 
-void ss_processor(ss_int_t listen_socket)
+void ss_processor(ss_int_t connect_socket)
 {
+        ss_int_t  listen_socket;
 	ss_int_t  module_ret;
 	ss_char_t recv_string[1024] = "";
 	ss_char_t method[50];
@@ -51,97 +52,106 @@ void ss_processor(ss_int_t listen_socket)
 	ss_char_t procotol[10];
 	ss_char_t real_path[10001];
 	ss_char_t testpath[10000];
-	
-	alarm(5);		/* set timeout */
 
-	if (0 < recv(listen_socket, recv_string, sizeof(recv_string), 0))
-	{
+	for (;;)
+	  {
+	    alarm(0);
+	    listen_socket = accept(connect_socket, NULL, 0);
+	    if (listen_socket == -1)
+	      {
+		continue;
+	      }
+	
+	    alarm(3);		/* set timeout */
+	
+	    if (0 < recv(listen_socket, recv_string, sizeof(recv_string), 0))
+	      {
 		alarm(0);	/* stop alarm */
 
 		if (0 != strlen(module_path))
-		{
-			if (-1 == (module_ret = process_func(listen_socket, recv_string))) /*return -1 means 502 error occurs.*/
-			{
-				senderror_502(listen_socket);
-				(void)close(listen_socket);
-				_exit(EXIT_FAILURE);
-			}
-			else if (module_ret == 0) /*Return 1 means continue execution.
-						    If not return 1, then exit.*/
-			{
-				(void)close(listen_socket);
-				_exit(EXIT_SUCCESS);
-			}
-		}
+		  {
+		    if (-1 == (module_ret = process_func(listen_socket, recv_string))) /*return -1 means 502 error occurs.*/
+		      {
+			senderror_502(listen_socket);
+			(void)close(listen_socket);
+			continue;
+		      }
+		    else if (module_ret == 0) /*Return 1 means continue execution.
+						If not return 1, then exit.*/
+		      {
+			(void)close(listen_socket);
+			continue;
+		      }
+		  }
 
 		sscanf(recv_string, "%s %s %s", method, request_path, procotol);
 		if (strlen(request_path) == 0) /*request is NULL*/
-		{
-			(void)close(listen_socket);
-			_exit(EXIT_FAILURE);
-		}
+		  {
+		    (void)close(listen_socket);
+		    continue;
+		  }
 
 		memcpy(testpath, request_path, sizeof(testpath));
 		if (strstr(testpath, "../") != NULL)
 		  {
-		     senderror_404(listen_socket);
-		     (void)close(listen_socket);
-		     _exit(EXIT_FAILURE);
+		    senderror_404(listen_socket);
+		    (void)close(listen_socket);
+		    continue;
 		  }
 		
 		(void)snprintf(real_path, sizeof(real_path), ".%s", request_path);
 		
 		if (0 != strlen(cgi_bin_path))
-		{
-			if (NULL != strstr(request_path, cgi_bin_path))
-			{
+		  {
+		    if (NULL != strstr(request_path, cgi_bin_path))
+		      {
 		 
-				if (0 == strcasecmp(method, "GET"))
-				{
-					ss_get_dynamic(listen_socket, real_path, recv_string);
-				}
-				else if (0 == strcasecmp(method, "POST"))
-				{
-					ss_post_dynamic(listen_socket, real_path, recv_string);
-				}
-				goto end; /*Next is process static.*/
-			}
-		}
+			if (0 == strcasecmp(method, "GET"))
+			  {
+			    ss_get_dynamic(listen_socket, real_path, recv_string);
+			  }
+			else if (0 == strcasecmp(method, "POST"))
+			  {
+			    ss_post_dynamic(listen_socket, real_path, recv_string);
+			  }
+			goto end; /*Next is process static.*/
+		      }
+		  }
 		else
-		{
-			if (NULL != strstr(request_path, "cgi-bin"))
-			{
+		  {
+		    if (NULL != strstr(request_path, "cgi-bin"))
+		      {
 				
-				if (0 == strcasecmp(method, "GET"))
-				{
-					ss_get_dynamic(listen_socket, real_path, recv_string);
-				}
-				else if (0 == strcasecmp(method, "POST"))
-				{
-				        ss_post_dynamic(listen_socket, real_path, recv_string);
-				}
-				goto end; /*Next is process static.*/
-			}
-		}
+			if (0 == strcasecmp(method, "GET"))
+			  {
+			    ss_get_dynamic(listen_socket, real_path, recv_string);
+			  }
+			else if (0 == strcasecmp(method, "POST"))
+			  {
+			    ss_post_dynamic(listen_socket, real_path, recv_string);
+			  }
+			goto end; /*Next is process static.*/
+		      }
+		  }
 
 		if (0 == strcasecmp(method, "GET"))
-		{
-			ss_get_static(listen_socket, real_path);
-		}
+		  {
+		    ss_get_static(listen_socket, real_path);
+		  }
 		else if (0 == strcasecmp(method, "POST"))
-		{
-			ss_post_static(listen_socket, real_path);
-		}
-	}
-	else
-	{
+		  {
+		    ss_post_static(listen_socket, real_path);
+		  }
+	      }
+	    else
+	      {
 		(void)close(listen_socket);
-		_exit(EXIT_FAILURE);
-	}
+		continue;
+	      }
 
-end:
-	(void)close(listen_socket);
-	_exit(EXIT_SUCCESS);
+	  end:
+	    (void)close(listen_socket);
+	  }
 }
 
 static ss_char_t *ss_get_file_type(ss_char_t *file_path)
@@ -186,14 +196,14 @@ static void ss_get_static(ss_int_t listen_socket, ss_char_t *real_path)
 	  if (target_file_handle == NULL)
 	    {
 	      senderror_404(listen_socket);
-	      _exit(EXIT_FAILURE);
+	      return;
 	    }
     	}
 
 	if (-1 == fstat(fileno(target_file_handle), &file_info))
 	  {
 	    senderror_502(listen_socket);
-	    _exit(EXIT_FAILURE);
+	    return;
 	  }
 
 	if (S_ISDIR(file_info.st_mode))
@@ -204,13 +214,13 @@ static void ss_get_static(ss_int_t listen_socket, ss_char_t *real_path)
 	    if (target_file_handle == NULL)
 	      {
 		senderror_404(listen_socket);
-		_exit(EXIT_FAILURE);
+		return;
 	      }
 
 	    if (-1 == fstat(fileno(target_file_handle), &file_info))
 	      {
 		senderror_502(listen_socket);
-		_exit(EXIT_FAILURE);
+		return;
 	      }
 	    
 	  }
@@ -273,7 +283,7 @@ static void ss_get_dynamic(ss_int_t listen_socket, ss_char_t *real_path, ss_char
 	{
 	    	senderror_502(listen_socket);
 		(void)close(listen_socket);
-		_exit(EXIT_FAILURE);
+		return;
 	}
 	if (S_ISDIR(file_info.st_mode))
 	{
@@ -284,27 +294,27 @@ static void ss_get_dynamic(ss_int_t listen_socket, ss_char_t *real_path, ss_char
 	{
 		senderror_502(listen_socket);
 		(void)close(listen_socket);
-		_exit(EXIT_FAILURE);
+		return;
 	}
 
 	if (-1 == dup2(listen_socket, STDOUT_FILENO))
 	{
 		senderror_502(listen_socket);
 		(void)close(listen_socket);
-		_exit(EXIT_FAILURE);
+		return;
 	}
 	if (-1 == dup2(listen_socket, STDERR_FILENO))
 	{
 		senderror_502(listen_socket);
 		(void)close(listen_socket);
-		_exit(EXIT_FAILURE);
+		return;
 	}
 
 	if (-1 == access(read_path, F_OK))
 	{
 		senderror_404(listen_socket);
 		(void)close(listen_socket);
-		_exit(EXIT_FAILURE);
+		return;
 	}
 	(void)send(listen_socket,
 	     "HTTP/1.1 200 OK\r\n",
@@ -315,11 +325,11 @@ static void ss_get_dynamic(ss_int_t listen_socket, ss_char_t *real_path, ss_char
 	{
 		senderror_502(listen_socket);
 		(void)close(listen_socket);
-		_exit(EXIT_FAILURE);
+		return;
 	}
 
 	(void)close(listen_socket);
-	_exit(EXIT_SUCCESS);
+	return;
 }
 
 static void ss_post_dynamic(ss_int_t listen_socket, ss_char_t *real_path, ss_char_t *recv_string)
@@ -332,7 +342,7 @@ static void ss_post_dynamic(ss_int_t listen_socket, ss_char_t *real_path, ss_cha
 	{
 		senderror_502(listen_socket);
 		(void)close(listen_socket);
-		_exit(EXIT_FAILURE);
+		return;
 	}
 	if (S_ISDIR(file_info.st_mode))
 	{
@@ -352,20 +362,20 @@ static void ss_post_dynamic(ss_int_t listen_socket, ss_char_t *real_path, ss_cha
 	{
 		senderror_502(listen_socket);
 		(void)close(listen_socket);
-		_exit(EXIT_FAILURE);
+		return;
 	}
 	if (-1 == dup2(listen_socket, STDERR_FILENO))
 	{
 		senderror_502(listen_socket);
 		(void)close(listen_socket);
-		_exit(EXIT_FAILURE);
+		return;
 	}
 
 	if (-1 == access(real_path, F_OK))
 	{
 		senderror_404(listen_socket);
 		(void)close(listen_socket);
-		_exit(EXIT_FAILURE);
+		return;
 	}
 	(void)send(listen_socket,
 	     "HTTP/1.1 200 OK\r\n",
@@ -375,11 +385,11 @@ static void ss_post_dynamic(ss_int_t listen_socket, ss_char_t *real_path, ss_cha
 	{
 		senderror_502(listen_socket);
 		(void)close(listen_socket);
-		_exit(EXIT_FAILURE);
+		return;
 	}
 	
 	(void)close(listen_socket);
-	_exit(EXIT_SUCCESS);
+	return;
 }
 
 static void set_based_env_get(ss_char_t *method, ss_char_t *recv_string, ss_char_t *parameter)

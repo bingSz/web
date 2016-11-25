@@ -20,6 +20,7 @@ static void     child_quit(int);
 
 extern ss_int_t target_port;
 extern ss_int_t backlog_number;
+extern ss_int_t worker_processes;
 
 void ss_worker()
 {
@@ -28,47 +29,53 @@ void ss_worker()
 	ss_int_t  fork_ret;
 	ss_int_t  child_fork_ret;
 
-	if ((fork_ret = fork()) < 0)
-	{
-		fprintf(stderr, "Create process failure: %s\n", strerror(errno));
-		exit(EXIT_FAILURE);
-	}
-	else if (fork_ret == 0)
-	{
-		/*Ignored any error. The same below.*/
-		(void)signal(SIGCHLD, child_quit);
+	ss_int_t  count;
 
-		if (-1 == (connect_socket = init_socket(target_port)))
-		{
-			perror("initialize socket");
-			exit(EXIT_FAILURE);
-		}
+	const ss_int_t allpid = worker_processes;
+	ss_int_t  subpid[allpid];
+	
+	/*Ignored any error. The same below.*/
+	(void)signal(SIGCHLD, child_quit);
 
-		for (;;)
-		{
-			listen_socket = accept(connect_socket, NULL, 0);
-			if (listen_socket == -1)
-			{
-				continue;
-			}
+	if (-1 == (connect_socket = init_socket(target_port)))
+	  {
+	    perror("initialize socket");
+	    exit(EXIT_FAILURE);
+	  }
 
-			if ((child_fork_ret = fork()) == 0)
-			{
-				ss_processor(listen_socket);
-				_exit(EXIT_SUCCESS);
-			}
-			else if (child_fork_ret < 0)
-			{
-				senderror_502(listen_socket);
-				(void)close(listen_socket);
-				continue;
-			}
-			else
-			{
-				(void)close(listen_socket);
-			}
-		}
-	}
+	for (count = 0; count < worker_processes; count++)
+	  {
+	    if ((fork_ret = fork()) == 0)
+	      {
+		ss_processor(connect_socket);
+	      }
+	    else if (fork_ret > 0)
+	      {
+		subpid[count] = fork_ret;
+	      }
+	  }
+	if (fork() == 0)
+	  {
+	    for (;;)
+	      {
+		for (count = 0; count < allpid; count++)
+		  {
+		    if (kill(subpid[count], 0) != 0)
+		      {
+			if ((fork_ret = fork()) == 0)
+			  {
+			    ss_processor(connect_socket);
+			  }
+			else if (fork_ret > 0)
+			  {
+			    subpid[count] = fork_ret;
+			  }
+		      }
+		  }
+		usleep(1000);
+	      }
+	  }
+	
 }
 
 static ss_int_t init_socket(ss_int_t port)

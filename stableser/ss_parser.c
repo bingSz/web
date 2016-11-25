@@ -35,6 +35,8 @@ ss_char_t send_type[1000][100];
 
 ss_char_t body_command[1000];
 
+ss_int_t  worker_processes = 4;
+
 /*private*/
 ss_int_t  line_count = 1;
 
@@ -47,6 +49,7 @@ static void ss_parse_error_404();
 static void ss_parse_error_502();
 static void ss_parse_module();
 static void ss_parse_cgi_bin_path();
+static void ss_parse_worker_processes();
 
 void ss_parse_config(ss_char_t *path)
 {
@@ -132,6 +135,10 @@ skip_check:
 		{
 			is_hash_existing++;
 			ss_parse_sendtype();
+		}
+		else if (0 == strncmp(line_string, "worker_processes", 16))
+		{
+			ss_parse_worker_processes();
 		}
 		else
 		{
@@ -254,5 +261,10 @@ static void ss_parse_module()
 static void ss_parse_cgi_bin_path()
 {
 	memcpy(cgi_bin_path, body_command, sizeof(cgi_bin_path));
+}
+
+static void ss_parse_worker_processes()
+{
+  worker_processes = atoi(body_command);
 }
 
