@@ -11,6 +11,7 @@
 #include <sys/types.h>
 #include <arpa/inet.h>
 #include <netinet/in.h>
+#include <time.h>
 
 /*hash*/
 #ifdef HASH_SEARCH
@@ -37,6 +38,8 @@ ss_char_t body_command[1000];
 
 ss_int_t  worker_processes = 4;
 
+struct timeval timeout = {3, 0}; /* Default, the timeout value is 3s */
+
 /*private*/
 ss_int_t  line_count = 1;
 
@@ -50,6 +53,7 @@ static void ss_parse_error_502();
 static void ss_parse_module();
 static void ss_parse_cgi_bin_path();
 static void ss_parse_worker_processes();
+static void ss_parse_timeout();
 
 void ss_parse_config(ss_char_t *path)
 {
@@ -140,6 +144,10 @@ skip_check:
 		{
 			ss_parse_worker_processes();
 		}
+		else if (0 == strncmp(line_string, "timeout", 7))
+		  {
+		    ss_parse_timeout();
+		  }
 		else
 		{
 			fprintf(stderr, "Line: %d\nUnknown command.\n", line_count);
@@ -266,5 +274,10 @@ static void ss_parse_cgi_bin_path()
 static void ss_parse_worker_processes()
 {
   worker_processes = atoi(body_command);
+}
+
+static void ss_parse_timeout()
+{
+  timeout.tv_sec = atoi(body_command);
 }
 

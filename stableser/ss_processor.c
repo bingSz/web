@@ -16,6 +16,7 @@
 #include <sys/stat.h>
 #include <sys/wait.h>
 #include <errno.h>
+#include <pthread.h>
 
 #define ss_post_static(listen_socket, real_path) \
 	ss_get_static(listen_socket, real_path)
@@ -42,115 +43,125 @@ static void ss_post_dynamic(ss_int_t, ss_char_t *, ss_char_t *);
 static void set_based_env(ss_char_t *, ss_char_t *);
 static void set_based_env_get(ss_char_t *, ss_char_t *, ss_char_t *);
 
-void ss_processor(ss_int_t connect_socket)
+static void ss_proc_request(void *);
+
+static void ss_proc_request(void *connsocket)
 {
-        ss_int_t  listen_socket;
-	ss_int_t  module_ret;
+        ss_int_t  module_ret;
 	ss_char_t recv_string[1024] = "";
 	ss_char_t method[50];
 	ss_char_t request_path[10000];
 	ss_char_t procotol[10];
 	ss_char_t real_path[10001];
 	ss_char_t testpath[10000];
+	ss_int_t  listen_socket = *((int *)connsocket);
+	
+	pthread_detach(pthread_self());
 
+	if (0 < recv(listen_socket, recv_string, sizeof(recv_string), 0))
+	  {
+	    if (0 != strlen(module_path))
+	      {
+		if (-1 == (module_ret = process_func(listen_socket, recv_string))) /*return -1 means 502 error occurs.*/
+		  {
+		    senderror_502(listen_socket);
+		    (void)close(listen_socket);
+		    return;
+		  }
+		else if (module_ret == 0) /*Return 1 means continue execution.
+					    If not return 1, then exit.*/
+		  {
+		    (void)close(listen_socket);
+		    return;
+		  }
+	      }
+
+	    sscanf(recv_string, "%s %s %s", method, request_path, procotol);
+	    if (strlen(request_path) == 0) /*request is NULL*/
+	      {
+		(void)close(listen_socket);
+		return;
+	      }
+
+	    memcpy(testpath, request_path, sizeof(testpath));
+	    if (strstr(testpath, "../") != NULL)
+	      {
+		senderror_404(listen_socket);
+		(void)close(listen_socket);
+		return;
+	      }
+		
+	    (void)snprintf(real_path, sizeof(real_path), ".%s", request_path);
+		
+	    if (0 != strlen(cgi_bin_path))
+	      {
+		if (NULL != strstr(request_path, cgi_bin_path))
+		  {
+		 
+		    if (0 == strcasecmp(method, "GET"))
+		      {
+			ss_get_dynamic(listen_socket, real_path, recv_string);
+		      }
+		    else if (0 == strcasecmp(method, "POST"))
+		      {
+			ss_post_dynamic(listen_socket, real_path, recv_string);
+		      }
+		    goto end; /*Next is process static.*/
+		  }
+	      }
+	    else
+	      {
+		if (NULL != strstr(request_path, "cgi-bin"))
+		  {
+				
+		    if (0 == strcasecmp(method, "GET"))
+		      {
+			ss_get_dynamic(listen_socket, real_path, recv_string);
+		      }
+		    else if (0 == strcasecmp(method, "POST"))
+		      {
+			ss_post_dynamic(listen_socket, real_path, recv_string);
+		      }
+		    goto end; /*Next is process static.*/
+		  }
+	      }
+
+	    if (0 == strcasecmp(method, "GET"))
+	      {
+		ss_get_static(listen_socket, real_path);
+	      }
+	    else if (0 == strcasecmp(method, "POST"))
+	      {
+		ss_post_static(listen_socket, real_path);
+	      }
+	  }
+	else
+	  {
+	    (void)close(listen_socket);
+	    return;
+	  }
+
+ end:
+	(void)close(listen_socket);
+}
+  
+void ss_processor(ss_int_t connect_socket)
+{
+        ss_int_t  listen_socket;
+	
+
+	pthread_t Threadid;
+	
 	for (;;)
 	  {
-	    alarm(0);
 	    listen_socket = accept(connect_socket, NULL, 0);
 	    if (listen_socket == -1)
 	      {
 		continue;
 	      }
-	
-	    alarm(3);		/* set timeout */
-	
-	    if (0 < recv(listen_socket, recv_string, sizeof(recv_string), 0))
-	      {
-		alarm(0);	/* stop alarm */
 
-		if (0 != strlen(module_path))
-		  {
-		    if (-1 == (module_ret = process_func(listen_socket, recv_string))) /*return -1 means 502 error occurs.*/
-		      {
-			senderror_502(listen_socket);
-			(void)close(listen_socket);
-			continue;
-		      }
-		    else if (module_ret == 0) /*Return 1 means continue execution.
-						If not return 1, then exit.*/
-		      {
-			(void)close(listen_socket);
-			continue;
-		      }
-		  }
-
-		sscanf(recv_string, "%s %s %s", method, request_path, procotol);
-		if (strlen(request_path) == 0) /*request is NULL*/
-		  {
-		    (void)close(listen_socket);
-		    continue;
-		  }
-
-		memcpy(testpath, request_path, sizeof(testpath));
-		if (strstr(testpath, "../") != NULL)
-		  {
-		    senderror_404(listen_socket);
-		    (void)close(listen_socket);
-		    continue;
-		  }
-		
-		(void)snprintf(real_path, sizeof(real_path), ".%s", request_path);
-		
-		if (0 != strlen(cgi_bin_path))
-		  {
-		    if (NULL != strstr(request_path, cgi_bin_path))
-		      {
-		 
-			if (0 == strcasecmp(method, "GET"))
-			  {
-			    ss_get_dynamic(listen_socket, real_path, recv_string);
-			  }
-			else if (0 == strcasecmp(method, "POST"))
-			  {
-			    ss_post_dynamic(listen_socket, real_path, recv_string);
-			  }
-			goto end; /*Next is process static.*/
-		      }
-		  }
-		else
-		  {
-		    if (NULL != strstr(request_path, "cgi-bin"))
-		      {
-				
-			if (0 == strcasecmp(method, "GET"))
-			  {
-			    ss_get_dynamic(listen_socket, real_path, recv_string);
-			  }
-			else if (0 == strcasecmp(method, "POST"))
-			  {
-			    ss_post_dynamic(listen_socket, real_path, recv_string);
-			  }
-			goto end; /*Next is process static.*/
-		      }
-		  }
-
-		if (0 == strcasecmp(method, "GET"))
-		  {
-		    ss_get_static(listen_socket, real_path);
-		  }
-		else if (0 == strcasecmp(method, "POST"))
-		  {
-		    ss_post_static(listen_socket, real_path);
-		  }
-	      }
-	    else
-	      {
-		(void)close(listen_socket);
-		continue;
-	      }
-
-	  end:
-	    (void)close(listen_socket);
+	    pthread_create(&Threadid, NULL, (void *)ss_proc_request, (void *)&listen_socket);
+	    
 	  }
 }
 

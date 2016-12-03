@@ -12,6 +12,7 @@
 #include <netinet/in.h>
 #include <sys/wait.h>
 #include <signal.h>
+#include <time.h>
 
 #define MAX_CONNECTION 511
 
@@ -21,6 +22,7 @@ static void     child_quit(int);
 extern ss_int_t target_port;
 extern ss_int_t backlog_number;
 extern ss_int_t worker_processes;
+extern struct timeval timeout;
 
 void ss_worker()
 {
@@ -93,6 +95,10 @@ static ss_int_t init_socket(ss_int_t port)
 	{
 		return -1;
 	}
+	if (setsockopt(temp_socket, SOL_SOCKET, SO_RCVTIMEO, (char *)&timeout, sizeof(struct timeval)) == -1)
+	  {
+	    return -1;
+	  }
 
 	addr.sin_family = AF_INET;
 	addr.sin_port = htons(port);
