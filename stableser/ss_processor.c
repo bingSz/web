@@ -43,9 +43,9 @@ static void ss_post_dynamic(ss_int_t, ss_char_t *, ss_char_t *);
 static void set_based_env(ss_char_t *, ss_char_t *);
 static void set_based_env_get(ss_char_t *, ss_char_t *, ss_char_t *);
 
-static void ss_proc_request(void *);
+static void ss_proc_request(int);
 
-static void ss_proc_request(void *connsocket)
+static void ss_proc_request(int listen_socket)
 {
         ss_int_t  module_ret;
 	ss_char_t recv_string[1024] = "";
@@ -54,7 +54,6 @@ static void ss_proc_request(void *connsocket)
 	ss_char_t procotol[10];
 	ss_char_t real_path[10001];
 	ss_char_t testpath[10000];
-	ss_int_t  listen_socket = *((int *)connsocket);
 	
 	pthread_detach(pthread_self());
 
@@ -66,13 +65,13 @@ static void ss_proc_request(void *connsocket)
 		  {
 		    senderror_502(listen_socket);
 		    (void)close(listen_socket);
-		    return;
+		    pthread_exit(NULL);
 		  }
 		else if (module_ret == 0) /*Return 1 means continue execution.
 					    If not return 1, then exit.*/
 		  {
 		    (void)close(listen_socket);
-		    return;
+		    pthread_exit(NULL);
 		  }
 	      }
 
@@ -80,7 +79,7 @@ static void ss_proc_request(void *connsocket)
 	    if (strlen(request_path) == 0) /*request is NULL*/
 	      {
 		(void)close(listen_socket);
-		return;
+	        pthread_exit(NULL);
 	      }
 
 	    memcpy(testpath, request_path, sizeof(testpath));
@@ -88,7 +87,7 @@ static void ss_proc_request(void *connsocket)
 	      {
 		senderror_404(listen_socket);
 		(void)close(listen_socket);
-		return;
+	        pthread_exit(NULL);
 	      }
 		
 	    (void)snprintf(real_path, sizeof(real_path), ".%s", request_path);
@@ -138,18 +137,17 @@ static void ss_proc_request(void *connsocket)
 	else
 	  {
 	    (void)close(listen_socket);
-	    return;
+	    pthread_exit(NULL);
 	  }
 
  end:
 	(void)close(listen_socket);
+	pthread_exit(NULL);
 }
-  
+
 void ss_processor(ss_int_t connect_socket)
 {
         ss_int_t  listen_socket;
-	
-
 	pthread_t Threadid;
 	
 	for (;;)
@@ -160,8 +158,10 @@ void ss_processor(ss_int_t connect_socket)
 		continue;
 	      }
 
-	    pthread_create(&Threadid, NULL, (void *)ss_proc_request, (void *)&listen_socket);
-	    
+	    if (0 != pthread_create(&Threadid, NULL, (void *)ss_proc_request, (void *)listen_socket))
+	      {
+		close(listen_socket);
+	      }
 	  }
 }
 
