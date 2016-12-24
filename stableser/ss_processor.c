@@ -277,7 +277,7 @@ static void ss_get_dynamic(ss_int_t listen_socket, ss_char_t *real_path, ss_char
 	ss_char_t read_path[1000];
 	ss_char_t *parameter;
 	struct stat file_info;
-	
+
 	if (NULL != (parameter = strstr(real_path, "?")))
 	{
 		parameter++;
@@ -327,6 +327,7 @@ static void ss_get_dynamic(ss_int_t listen_socket, ss_char_t *real_path, ss_char
 		(void)close(listen_socket);
 		return;
 	}
+
 	(void)send(listen_socket,
 	     "HTTP/1.1 200 OK\r\n",
 	     strlen("HTTP/1.1 200 OK\r\n"),
@@ -411,11 +412,13 @@ static void set_based_env_get(ss_char_t *method, ss_char_t *recv_string, ss_char
 	ss_char_t parameter_temp[1024];
 
 	memcpy(parameter_temp, parameter, sizeof(parameter_temp));
-	
+
+	fflush(stdout);
+
 	(void)snprintf(length, sizeof(length), "%d", (int)strlen(parameter_temp));
 
 	(void)snprintf(port_string, sizeof(port_string), "%d", target_port);
-
+	
 	if (-1 == gethostname(host_name, sizeof(host_name)))
 	{
 		memcpy(host_name, "", sizeof(host_name));
