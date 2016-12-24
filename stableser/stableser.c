@@ -21,7 +21,7 @@ int main(int argc, char * argv[])
 				     {"config", required_argument, NULL, (int)'c'}, 
 				     {0, 0, 0, 0}};
 
-	while ((result_opt = getopt_long(argc, argv, short_opts, long_opts, NULL)) != -1)
+	while ((result_opt = getopt_long(argc, argv, short_opts, long_opts, NULL)) != -1 && result_opt != 255)
 	{
 		switch (result_opt)
 		{
