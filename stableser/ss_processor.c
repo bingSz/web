@@ -286,6 +286,7 @@ static void ss_get_dynamic(ss_int_t listen_socket, ss_char_t *real_path, ss_char
 	}
 	else
 	{
+		parameter = "";
 		memcpy(read_path, real_path, sizeof(read_path));
 		set_based_env_get("GET", recv_string, "");
 	}
@@ -364,6 +365,10 @@ static void ss_post_dynamic(ss_int_t listen_socket, ss_char_t *real_path, ss_cha
 	if (NULL != (parameter = strstr(recv_string, "\r\n\r\n")))
 	{
 		parameter += 4;
+	}
+	else
+	{
+		parameter = "";
 	}
 
 	set_based_env("POST", recv_string);
